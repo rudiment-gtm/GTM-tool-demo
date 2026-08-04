@@ -108,7 +108,7 @@ export default function App() {
       } else if (!res.ok || data.error) {
         setMessages((m) => [...m, { role: 'bot', text: 'Claude request failed: ' + (data.error || res.status) }]);
       } else {
-        setMessages((m) => [...m, { role: 'bot', text: data.text }]);
+        setMessages((m) => [...m, { role: 'bot', text: data.text, rows: data.rows, columns: data.columns, count: data.count, pin: data.pin }]);
       }
     } catch {
       setThinking(false);

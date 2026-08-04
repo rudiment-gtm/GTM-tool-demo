@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { C, btnGhost, btnPrimary, mono } from '../theme.js';
 import { MODELS, SUGGESTIONS } from '../data.js';
 
-function ResultTable({ rows }) {
+function ResultTable({ rows, columns }) {
   const cols = '1.7fr 1fr .8fr .8fr';
+  const labels = columns || ['ACCOUNT', 'CITY', 'STATUS', 'VALUE'];
   return (
     <div style={{ border: '1px solid ' + C.border, background: C.card, borderRadius: 11, overflowX: 'auto' }}>
       <div style={{ minWidth: 460, display: 'grid', gridTemplateColumns: cols, background: C.cardAlt, borderBottom: '1px solid ' + C.border, padding: '9px 14px', color: C.textDim, fontSize: 10.5, fontFamily: mono, letterSpacing: '.08em' }}>
-        <div>ACCOUNT</div><div>CITY</div><div>STATUS</div><div>VALUE</div>
+        {labels.map((label) => <div key={label}>{label}</div>)}
       </div>
       {rows.map((r, i) => (
         <div key={i} style={{ minWidth: 460, display: 'grid', gridTemplateColumns: cols, padding: '10px 14px', color: C.textBody, fontSize: 12.5, borderTop: '1px solid ' + C.line, whiteSpace: 'nowrap' }}>
@@ -75,8 +76,8 @@ export default function ChatView({ title, model, setModel, messages, thinking, s
                 <div style={{ display: 'flex', gap: 12, width: '100%' }}>
                   <div style={{ width: 26, height: 26, borderRadius: 7, background: C.green, flexShrink: 0 }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minWidth: 0 }}>
-                    <div style={{ color: '#D8D7D3', fontSize: 13.5, lineHeight: 1.62, textWrap: 'pretty' }}>{m.text}</div>
-                    {m.rows && <ResultTable rows={m.rows} />}
+                    <div style={{ color: '#D8D7D3', fontSize: 13.5, lineHeight: 1.62, textWrap: 'pretty', whiteSpace: 'pre-wrap' }}>{m.text}</div>
+                    {m.rows && <ResultTable rows={m.rows} columns={m.columns} />}
                     {m.rows && (
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <div onClick={() => onShowOnMap(m)} style={btnPrimary}>Show these on map</div>

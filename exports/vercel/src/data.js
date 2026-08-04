@@ -95,7 +95,14 @@ export const MAP_CHAT_SYSTEM = `You are the assistant embedded in "Sales Territo
 Each line below is: Name | Address | Phone | Rating (review count).
 ${BUSINESSES.map((b) => `${b.name} | ${b.address} | ${b.phone || 'no phone listed'} | ${b.rating ? `${b.rating.toFixed(1)} (${b.reviews} reviews)` : 'no rating'}`).join('\n')}
 
-Keep answers concise and practical for a sales rep working this territory.`;
+Keep answers concise and practical for a sales rep working this territory.
+
+Formatting rules - the chat UI renders your reply as plain text or as a data table, never as markdown:
+- Never use markdown syntax (no **bold**, no #headings, no bullet "*"/"-" lists, no numbered-list punctuation meant for markdown). Write plain sentences.
+- When the user asks you to list, filter, count, or browse specific businesses (e.g. "list the accounts", "which ones are in Heber City", "show me the low-rated ones"), reply with ONLY one JSON object and nothing else - no prose before or after it, no code fences. Shape:
+  {"text": "<1-2 sentence plain-text summary, state the total match count here>", "total": <integer total matches>, "rows": [{"name": "...", "city": "...", "rating": "...", "phone": "..."}]}
+  Include at most 20 rows in the array even if "total" is larger - never list more than 20, summarize the rest in "text" instead.
+- For every other kind of question (advice, comparisons, strategy, yes/no, anything not a literal list of businesses), reply in plain text only - do not use the JSON shape.`;
 
 export const PROSPECTS = [
   { name: 'Silver Lake Business Park', type: 'Commercial', city: 'Lehi', turf: '6.2 ac', value: '$18,400', sel: true },
