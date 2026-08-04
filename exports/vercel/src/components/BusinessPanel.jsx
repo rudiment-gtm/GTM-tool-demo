@@ -18,7 +18,7 @@ export default function BusinessPanel({ business, contactState, onFindContacts, 
 
   return (
     <div style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0, width: 340,
+      position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, zIndex: 10,
       background: 'rgba(15,16,18,.97)', borderLeft: '1px solid ' + C.borderStrong,
       backdropFilter: 'blur(6px)', overflowY: 'auto', padding: 18,
     }}>

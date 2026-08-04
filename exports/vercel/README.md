@@ -26,7 +26,7 @@ LeadMagic isn't connected yet instead of failing silently.
 
 - **Tab switcher** - keyboard-navigable, deep-linkable via `#/chat`, `#/map`, `#/prospect`, `#/enrich`.
 - **Chat** - type a message or click a suggestion; canned replies are keyword-matched in `src/data.js`. Model picker switches between Claude and GPT names. "Show these on map" navigates to Map and updates the visible count and pin banner.
-- **Map** - a real Leaflet map (free OpenStreetMap tiles, no API key) pinning 83 real Wasatch Front/Utah County businesses from a Google Maps export, with a name/address search filter. Clicking a pin opens a right-side detail panel (rating, phone, website, address) with a **Find contacts** button that calls `/api/find-contacts` (LeadMagic) to look up a main contact. "Find surrounding businesses" routes into Enrich.
+- **Map** - a real Leaflet map (free OpenStreetMap tiles, no API key) pinning 83 real Wasatch Front/Utah County businesses from a Google Maps export, with a name/address search filter. Nearby businesses cluster into a numbered bubble until you zoom in, so dense towns don't turn into an unclickable pile of overlapping dots. Clicking a pin opens a right-side detail panel (rating, phone, website, address) with a **Find contacts** button that calls `/api/find-contacts` (LeadMagic) to look up a main contact. "Find surrounding businesses" routes into Enrich.
 - **Prospect** - row selection, "Add N to map", per-row Enrich.
 - **Enrich** - "Reveal - 2" unmasks a contact and deducts 2 credits from the live balance; "Reveal all" charges in bulk. Meter turns amber below 10%.
 
