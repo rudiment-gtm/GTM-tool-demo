@@ -1,49 +1,29 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { C } from '../theme.js';
 import { BUSINESSES } from '../data.js';
+import { findContacts } from '../services/leadmagic.js';
+import BusinessPanel from '../components/BusinessPanel.jsx';
 
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+// Standard OSM raster tiles - free, no key, reliable at real-world traffic.
+// Swap for Mapbox (with a token) if this needs OSM's higher-volume usage terms later.
+const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 const DOT_ICON = L.divIcon({
   className: '',
-  html: `<div style="width:11px;height:11px;border-radius:50%;background:${C.green};border:2px solid rgba(11,11,13,.85);box-shadow:0 0 0 3px rgba(43,213,118,.22)"></div>`,
-  iconSize: [11, 11],
-  iconAnchor: [5, 5],
-  popupAnchor: [0, -8],
+  html: `<div style="width:14px;height:14px;border-radius:50%;background:${C.green};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`,
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
 });
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-function popupHtml(b) {
-  const ratingLine = b.rating ? `${b.rating.toFixed(1)} &#9733; &middot; ${b.reviews.toLocaleString()} reviews` : 'No rating yet';
-  const links = [
-    b.website && `<a href="${escapeHtml(b.website)}" target="_blank" rel="noopener noreferrer" style="color:${C.green}">Website</a>`,
-    `<a href="${escapeHtml(b.mapsUrl)}" target="_blank" rel="noopener noreferrer" style="color:${C.green}">Google Maps</a>`,
-  ].filter(Boolean).join('<span style="color:#5D6067;margin:0 6px">&middot;</span>');
-
-  return `
-    <div style="font-family:'JetBrains Mono',monospace;min-width:210px">
-      <div style="font-size:13px;font-weight:600;color:#EDEDEA;margin-bottom:4px">${escapeHtml(b.name)}</div>
-      <div style="font-size:11.5px;color:#9DA0A6;margin-bottom:6px">${escapeHtml(b.address)}</div>
-      ${b.description ? `<div style="font-size:11.5px;color:#9DA0A6;margin-bottom:6px">${escapeHtml(b.description)}</div>` : ''}
-      <div style="font-size:11.5px;color:#D6D5D1;margin-bottom:2px">${ratingLine}</div>
-      <div style="font-size:11.5px;color:#D6D5D1;margin-bottom:8px">${escapeHtml(b.phone)}</div>
-      <div style="font-size:11.5px">${links}</div>
-    </div>
-  `;
-}
 
 export default function MapView({ active, pinned, clearPinned, mapSearch, setMapSearch, onSync, onSurrounding, onAsk }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const [selected, setSelected] = useState(null);
+  const [contactState, setContactState] = useState({}); // mapsUrl -> { loading, contact, error, notConfigured, searched }
 
-  // Real business pins (from a Google Maps export) replace the old static dotted screenshot.
-  // Free CARTO/OSM tiles - swap for Mapbox (with a token) or a live geocoder when the backend lands.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -53,11 +33,11 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
       zoomControl: false,
       attributionControl: true,
     });
-    L.tileLayer(TILE_URL, { subdomains: 'abcd', maxZoom: 19, attribution: TILE_ATTRIBUTION }).addTo(map);
+    L.tileLayer(TILE_URL, { subdomains: 'abc', maxZoom: 19, attribution: TILE_ATTRIBUTION }).addTo(map);
 
     markersRef.current = BUSINESSES.map((b) => {
       const marker = L.marker([b.lat, b.lng], { icon: DOT_ICON }).addTo(map);
-      marker.bindPopup(popupHtml(b));
+      marker.on('click', () => setSelected(b));
       marker.searchText = `${b.name} ${b.address}`.toLowerCase();
       return marker;
     });
@@ -89,6 +69,20 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
     if (!q) return BUSINESSES.length;
     return BUSINESSES.filter((b) => `${b.name} ${b.address}`.toLowerCase().includes(q)).length;
   }, [mapSearch]);
+
+  const handleFindContacts = async (business) => {
+    const key = business.mapsUrl;
+    setContactState((s) => ({ ...s, [key]: { loading: true } }));
+    try {
+      const data = await findContacts(business);
+      setContactState((s) => ({
+        ...s,
+        [key]: { loading: false, searched: true, notConfigured: !!data.notConfigured, contact: data.contacts?.[0] || null },
+      }));
+    } catch {
+      setContactState((s) => ({ ...s, [key]: { loading: false, error: true } }));
+    }
+  };
 
   return (
     <div style={{
@@ -140,6 +134,13 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
           Ask about these accounts
         </div>
       </div>
+
+      <BusinessPanel
+        business={selected}
+        contactState={selected ? contactState[selected.mapsUrl] : null}
+        onFindContacts={handleFindContacts}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }
