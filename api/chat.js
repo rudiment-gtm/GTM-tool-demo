@@ -20,8 +20,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { model, messages } = req.body || {};
-  console.log('[api/chat] request body:', { model, messageCount: Array.isArray(messages) ? messages.length : 'not an array' });
+  const { model, system, messages } = req.body || {};
+  console.log('[api/chat] request body:', { model, hasSystem: !!system, messageCount: Array.isArray(messages) ? messages.length : 'not an array' });
 
   if (!Array.isArray(messages) || !messages.length) {
     res.status(400).json({ error: 'messages array is required' });
@@ -33,6 +33,7 @@ export default async function handler(req, res) {
     const response = await client.messages.create({
       model: model || DEFAULT_MODEL,
       max_tokens: MAX_TOKENS,
+      system,
       messages,
     });
 

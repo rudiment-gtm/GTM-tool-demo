@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { C } from './theme.js';
-import { CLAUDE_MODEL_IDS, CONTACTS, COUNTS, PROSPECTS, TOTAL_ACCOUNTS, pickReply } from './data.js';
+import { CLAUDE_MODEL_IDS, CONTACTS, COUNTS, MAP_CHAT_SYSTEM, PROSPECTS, TOTAL_ACCOUNTS, pickReply } from './data.js';
 import Sidebar from './components/Sidebar.jsx';
 import MapView from './views/MapView.jsx';
 import ChatView from './views/ChatView.jsx';
@@ -97,6 +97,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: claudeModelId,
+          system: MAP_CHAT_SYSTEM,
           messages: history.map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
         }),
       });

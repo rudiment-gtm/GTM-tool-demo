@@ -88,6 +88,15 @@ export const BUSINESSES = [
   { name: 'Discount Tire', address: '661 NW State St, American Fork, UT 84003, USA', phone: '+1 801-763-8604', website: 'https://www.discounttire.com/store/ut/american-fork/s/1626', mapsUrl: 'https://www.google.com/maps/place/?q=place_id:ChIJpf1ciKOBTYcRmpmiBY0yPJs', description: '', rating: 4.3, reviews: 807, lat: 40.380798, lng: -111.787437 },
 ];
 
+// System prompt for real Claude chat requests, grounding replies in the actual
+// Map tab data instead of a generic "what map do you mean?" response.
+export const MAP_CHAT_SYSTEM = `You are the assistant embedded in "Sales Territory Mapper", a GTM tool for a landscaping/property-services sales team. The Map tab currently plots ${BUSINESSES.length} real businesses (an auto/service industry account list across the Wasatch Front and Utah County, sourced from a Google Maps export). When the user asks about "the map", "these accounts", "these businesses", or similar, answer from this exact list - do not ask what map they mean.
+
+Each line below is: Name | Address | Phone | Rating (review count).
+${BUSINESSES.map((b) => `${b.name} | ${b.address} | ${b.phone || 'no phone listed'} | ${b.rating ? `${b.rating.toFixed(1)} (${b.reviews} reviews)` : 'no rating'}`).join('\n')}
+
+Keep answers concise and practical for a sales rep working this territory.`;
+
 export const PROSPECTS = [
   { name: 'Silver Lake Business Park', type: 'Commercial', city: 'Lehi', turf: '6.2 ac', value: '$18,400', sel: true },
   { name: 'Traverse Ridge HOA', type: 'HOA', city: 'Draper', turf: '4.8 ac', value: '$14,900', sel: true },
