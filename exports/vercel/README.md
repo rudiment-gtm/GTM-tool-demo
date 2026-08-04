@@ -23,6 +23,12 @@ enable live contact search and real Claude replies (both server-side only - neve
 code). Without a key, each feature reports that it isn't connected yet instead of failing
 silently.
 
+When adding either variable, check **Preview** and **Production** (Vercel's "Development"
+checkbox only applies to `vercel dev` run locally with the Vercel CLI - it does nothing for
+an actual deployed URL). Also note Vercel only injects env vars into deployments created
+*after* the variable was added, so a variable added post-deploy needs a fresh deploy
+(push a commit, or "Redeploy" in the dashboard) before it takes effect.
+
 ## What works in the demo
 
 - **Tab switcher** - keyboard-navigable, deep-linkable via `#/chat`, `#/map`, `#/prospect`, `#/enrich`.
