@@ -1,0 +1,8 @@
+{
+  "name": "gtm-tool-demo-api",
+  "private": true,
+  "description": "Vercel serverless functions (api/) for the GTM tool demo - kept separate from the frontend in exports/vercel.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0"
+  }
+}

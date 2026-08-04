@@ -131,7 +131,15 @@ export const COUNTS = {
 
 export const TOTAL_ACCOUNTS = 2773;
 
-export const MODELS = ['Claude Sonnet 4.5', 'Claude Opus 4.1', 'GPT-5', 'GPT-5 mini'];
+export const MODELS = ['Claude Opus 5', 'Claude Sonnet 5', 'GPT-5', 'GPT-5 mini'];
+
+// Maps a MODELS display name to the real Claude API model ID for /api/chat.
+// Entries not in this map (GPT-5, GPT-5 mini) have no connected key, so Chat
+// keeps using the canned replies below for them.
+export const CLAUDE_MODEL_IDS = {
+  'Claude Opus 5': 'claude-opus-5',
+  'Claude Sonnet 5': 'claude-sonnet-5',
+};
 
 export const SUGGESTIONS = [
   { label: 'Summarize churn risk', q: 'Summarize churn risk across canceled accounts' },

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { C } from './theme.js';
-import { CONTACTS, COUNTS, PROSPECTS, TOTAL_ACCOUNTS, pickReply } from './data.js';
+import { CLAUDE_MODEL_IDS, CONTACTS, COUNTS, PROSPECTS, TOTAL_ACCOUNTS, pickReply } from './data.js';
 import Sidebar from './components/Sidebar.jsx';
 import MapView from './views/MapView.jsx';
 import ChatView from './views/ChatView.jsx';
@@ -64,27 +64,56 @@ export default function App() {
   }, []);
 
   // chat ---------------------------------------------------------------
-  const [model, setModel] = useState('Claude Sonnet 4.5');
+  const [model, setModel] = useState('Claude Sonnet 5');
   const [messages, setMessages] = useState([]);
   const [chatTitle, setChatTitle] = useState('New chat');
   const [thinking, setThinking] = useState(false);
   const replyTimer = useRef();
   useEffect(() => () => clearTimeout(replyTimer.current), []);
 
-  const send = useCallback((raw) => {
+  const send = useCallback(async (raw) => {
     const text = (raw || '').trim();
     if (!text || thinking) return;
-    const reply = pickReply(text);
-    setMessages((m) => [...m, { role: 'user', text }]);
+    const history = [...messages, { role: 'user', text }];
+    setMessages(history);
     setChatTitle((t) => (messages.length ? t : text.slice(0, 46)));
     setThinking(true);
-    clearTimeout(replyTimer.current);
-    // Replace this timeout with a streaming fetch('/api/chat') when the backend lands.
-    replyTimer.current = setTimeout(() => {
+
+    const claudeModelId = CLAUDE_MODEL_IDS[model];
+    if (!claudeModelId) {
+      // No key connected for this model (e.g. GPT-5) - fall back to the canned demo replies.
+      const reply = pickReply(text);
+      clearTimeout(replyTimer.current);
+      replyTimer.current = setTimeout(() => {
+        setThinking(false);
+        setMessages((m) => [...m, { role: 'bot', ...reply }]);
+      }, 900);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: claudeModelId,
+          messages: history.map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
       setThinking(false);
-      setMessages((m) => [...m, { role: 'bot', ...reply }]);
-    }, 900);
-  }, [messages.length, thinking]);
+      if (data.notConfigured) {
+        setMessages((m) => [...m, { role: 'bot', text: "Claude isn't connected yet - add ANTHROPIC_API_KEY in the Vercel project to enable real replies." }]);
+      } else if (!res.ok || data.error) {
+        setMessages((m) => [...m, { role: 'bot', text: 'Claude request failed: ' + (data.error || res.status) }]);
+      } else {
+        setMessages((m) => [...m, { role: 'bot', text: data.text }]);
+      }
+    } catch {
+      setThinking(false);
+      setMessages((m) => [...m, { role: 'bot', text: 'Could not reach Claude - check your connection and try again.' }]);
+    }
+  }, [messages, thinking, model]);
 
   const applyToMap = useCallback((reply) => {
     setShowing(reply.count);
