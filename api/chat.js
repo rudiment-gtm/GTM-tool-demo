@@ -12,12 +12,17 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  console.log('[api/chat] ANTHROPIC_API_KEY present:', !!apiKey, 'length:', apiKey ? apiKey.length : 0);
+
   if (!apiKey) {
+    console.error('[api/chat] no ANTHROPIC_API_KEY in this runtime - returning notConfigured');
     res.status(200).json({ notConfigured: true });
     return;
   }
 
   const { model, messages } = req.body || {};
+  console.log('[api/chat] request body:', { model, messageCount: Array.isArray(messages) ? messages.length : 'not an array' });
+
   if (!Array.isArray(messages) || !messages.length) {
     res.status(400).json({ error: 'messages array is required' });
     return;
@@ -32,8 +37,10 @@ export default async function handler(req, res) {
     });
 
     const text = response.content.find((block) => block.type === 'text')?.text || '';
+    console.log('[api/chat] Claude responded, stop_reason:', response.stop_reason, 'text length:', text.length);
     res.status(200).json({ text });
   } catch (err) {
+    console.error('[api/chat] upstream error - status:', err.status, 'name:', err.name, 'message:', err.message, 'body:', JSON.stringify(err.error || null));
     res.status(502).json({ error: err.message || 'Claude request failed' });
   }
 }

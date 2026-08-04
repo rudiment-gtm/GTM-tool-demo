@@ -13,7 +13,10 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.LEADMAGIC_API_KEY;
+  console.log('[api/find-contacts] LEADMAGIC_API_KEY present:', !!apiKey, 'length:', apiKey ? apiKey.length : 0);
+
   if (!apiKey) {
+    console.error('[api/find-contacts] no LEADMAGIC_API_KEY in this runtime - returning notConfigured');
     res.status(200).json({ notConfigured: true, contacts: [] });
     return;
   }
@@ -23,6 +26,7 @@ export default async function handler(req, res) {
     .replace(/^https?:\/\//, '')
     .replace(/^www\./, '')
     .split('/')[0];
+  console.log('[api/find-contacts] request body:', { companyName, website, domain });
 
   try {
     const upstream = await fetch('https://api.leadmagic.io/profile-search', {
@@ -34,7 +38,17 @@ export default async function handler(req, res) {
       body: JSON.stringify({ company_name: companyName, domain }),
     });
 
-    const data = await upstream.json();
+    const rawBody = await upstream.text();
+    console.log('[api/find-contacts] upstream status:', upstream.status, 'body:', rawBody.slice(0, 1000));
+
+    let data;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      res.status(502).json({ error: 'LeadMagic returned a non-JSON response (status ' + upstream.status + ')' });
+      return;
+    }
+
     if (!upstream.ok) {
       res.status(upstream.status).json({ error: data?.message || 'LeadMagic request failed' });
       return;
@@ -49,6 +63,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ contacts });
   } catch (err) {
+    console.error('[api/find-contacts] fetch to LeadMagic threw:', err.message);
     res.status(502).json({ error: 'Could not reach LeadMagic' });
   }
 }
