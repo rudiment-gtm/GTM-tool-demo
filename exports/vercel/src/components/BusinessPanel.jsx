@@ -39,7 +39,7 @@ export default function BusinessPanel({ business, contactState, onFindContacts, 
       <div style={row}>
         <span style={rowLabel}>Website</span>
         <span style={rowValue}>
-          {b.website ? <a href={b.website} target="_blank" rel="noopener noreferrer" style={{ color: C.green }}>{b.website.replace(/^https?:\/\//, '')}</a> : '—'}
+          {b.website ? <a href={/^https?:\/\//.test(b.website) ? b.website : `https://${b.website}`} target="_blank" rel="noopener noreferrer" style={{ color: C.green }}>{b.website.replace(/^https?:\/\//, '')}</a> : '—'}
         </span>
       </div>
       <div style={{ ...row, borderBottom: 'none', alignItems: 'flex-start' }}>
