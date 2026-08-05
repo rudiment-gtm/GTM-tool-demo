@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { C, mono } from '../theme.js';
+import { C, mono, btnPrimary } from '../theme.js';
 import { BUSINESSES } from '../data.js';
 import { findEmployees } from '../services/leadmagic.js';
 import { cityFromAddress } from '../utils/address.js';
+
+const personKey = (e) => `${e.firstName}|${e.lastName}`;
 
 const chipSelect = {
   background: C.cardAlt,
@@ -21,6 +23,7 @@ export default function ProspectView({ onPushToMap, spend, flash }) {
   const [expanded, setExpanded] = useState(null); // mapsUrl of the expanded business
   const [titleFilter, setTitleFilter] = useState('');
   const [employeesByBusiness, setEmployeesByBusiness] = useState({}); // mapsUrl -> { loading, error, notConfigured, employees }
+  const [selectedByBusiness, setSelectedByBusiness] = useState({}); // mapsUrl -> { [personKey]: true }
 
   const cities = useMemo(() => {
     const set = new Set(BUSINESSES.map((b) => cityFromAddress(b.address)).filter(Boolean));
@@ -61,6 +64,25 @@ export default function ProspectView({ onPushToMap, spend, flash }) {
     } catch {
       setEmployeesByBusiness((s) => ({ ...s, [key]: { loading: false, error: true, employees: [] } }));
     }
+  };
+
+  const toggleSelect = (businessKey, person) => {
+    setSelectedByBusiness((s) => {
+      const current = { ...(s[businessKey] || {}) };
+      const k = personKey(person);
+      if (current[k]) delete current[k]; else current[k] = true;
+      return { ...s, [businessKey]: current };
+    });
+  };
+
+  const pushSelected = (business) => {
+    const key = business.mapsUrl;
+    const selectedKeys = selectedByBusiness[key] || {};
+    const chosen = (employeesByBusiness[key]?.employees || []).filter((e) => selectedKeys[personKey(e)]);
+    if (!chosen.length) return;
+    onPushToMap(business, chosen);
+    flash?.(`Pushed ${chosen.length} contact${chosen.length === 1 ? '' : 's'} to the Map tab`);
+    setSelectedByBusiness((s) => ({ ...s, [key]: {} }));
   };
 
   return (
@@ -139,32 +161,43 @@ export default function ProspectView({ onPushToMap, spend, flash }) {
                           style={{ background: C.cardAlt, border: '1px solid ' + C.border, borderRadius: 7, padding: '6px 10px', color: '#EDEDEA', fontSize: 12, outline: 'none' }}
                         />
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {employees.map((e, ei) => (
-                            <div key={`${bi}-${ei}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: C.cardAlt, borderRadius: 8 }}>
-                              <div>
-                                <div style={{ color: '#EDEDEA', fontSize: 12.5 }}>{e.firstName} {e.lastName}</div>
-                                {e.title && <div style={{ color: C.textDim, fontSize: 11 }}>{e.title}</div>}
-                                {e.linkedinUrl && (
-                                  <a
-                                    href={/^https?:\/\//.test(e.linkedinUrl) ? e.linkedinUrl : `https://${e.linkedinUrl}`}
-                                    target="_blank" rel="noopener noreferrer"
-                                    onClick={(ev) => ev.stopPropagation()}
-                                    style={{ color: C.green, fontSize: 10.5 }}
-                                  >
-                                    LinkedIn
-                                  </a>
-                                )}
-                              </div>
+                          {employees.map((e, ei) => {
+                            const checked = !!selectedByBusiness[key]?.[personKey(e)];
+                            return (
                               <div
-                                onClick={() => { onPushToMap(b, e); flash?.(`Pushed ${e.firstName} ${e.lastName} to the Map tab`); }}
-                                style={{ border: '1px solid ' + C.greenBorder, color: C.green, borderRadius: 7, padding: '4px 9px', fontSize: 11, cursor: 'pointer' }}
+                                key={`${bi}-${ei}`}
+                                onClick={() => toggleSelect(key, e)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: checked ? C.raised : C.cardAlt, border: '1px solid ' + (checked ? C.greenBorder : 'transparent'), borderRadius: 8, cursor: 'pointer' }}
                               >
-                                Push to Map &#8594;
+                                <input type="checkbox" checked={checked} onChange={() => toggleSelect(key, e)} onClick={(ev) => ev.stopPropagation()} style={{ cursor: 'pointer' }} />
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ color: '#EDEDEA', fontSize: 12.5 }}>{e.firstName} {e.lastName}</div>
+                                  {e.title && <div style={{ color: C.textDim, fontSize: 11 }}>{e.title}</div>}
+                                  {e.linkedinUrl && (
+                                    <a
+                                      href={/^https?:\/\//.test(e.linkedinUrl) ? e.linkedinUrl : `https://${e.linkedinUrl}`}
+                                      target="_blank" rel="noopener noreferrer"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                      style={{ color: C.green, fontSize: 10.5 }}
+                                    >
+                                      LinkedIn
+                                    </a>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                           {employees.length === 0 && <div style={{ color: C.textDim, fontSize: 12 }}>No employees match "{titleFilter}".</div>}
                         </div>
+
+                        {Object.keys(selectedByBusiness[key] || {}).length > 0 && (
+                          <div
+                            onClick={() => pushSelected(b)}
+                            style={{ ...btnPrimary, textAlign: 'center', padding: '9px 12px' }}
+                          >
+                            Push {Object.keys(selectedByBusiness[key] || {}).length} to Map &#8594;
+                          </div>
+                        )}
                       </>
                     )}
                   </div>

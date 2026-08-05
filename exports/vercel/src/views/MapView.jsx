@@ -36,7 +36,7 @@ function clusterIcon(cluster) {
 
 export default function MapView({
   active, pinned, clearPinned, mapSearch, setMapSearch, onSync, onSurrounding, onAsk,
-  savedContacts, onSaveContact, pendingContact, focusMapsUrl, onFocusHandled, spend, flash,
+  savedContacts, onSaveContact, pendingContacts, focusMapsUrl, onFocusHandled, spend, flash,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -115,27 +115,29 @@ export default function MapView({
     }));
   }
 
-  // A contact pushed from the Prospect tab arrives as focusMapsUrl + pendingContact
+  // One or more contacts pushed from the Prospect tab arrive as focusMapsUrl + pendingContacts
   // together (set in the same event, so this effect sees both already updated) -
-  // select that business, pan to it, and add it to that business's contact list unrevealed.
+  // select that business, pan to it, and add each person to its contact list unrevealed.
   useEffect(() => {
     if (!focusMapsUrl) return;
     const biz = BUSINESSES.find((b) => b.mapsUrl === focusMapsUrl);
     if (biz) {
       setSelected(biz);
       mapRef.current?.setView([biz.lat, biz.lng], Math.max(mapRef.current.getZoom() || 9, 13));
-      if (pendingContact?.mapsUrl === focusMapsUrl) {
-        const name = [pendingContact.firstName, pendingContact.lastName].filter(Boolean).join(' ');
+      if (pendingContacts?.mapsUrl === focusMapsUrl) {
         setContactState((s) => ({ ...s, [focusMapsUrl]: { ...s[focusMapsUrl], searched: true } }));
-        mergeContact(focusMapsUrl, name, {
-          firstName: pendingContact.firstName,
-          lastName: pendingContact.lastName,
-          name,
-          title: pendingContact.title,
-          linkedinUrl: pendingContact.linkedinUrl || null,
-          email: null,
-          phone: null,
-          saved: false,
+        pendingContacts.people.forEach((person) => {
+          const name = [person.firstName, person.lastName].filter(Boolean).join(' ');
+          mergeContact(focusMapsUrl, name, {
+            firstName: person.firstName,
+            lastName: person.lastName,
+            name,
+            title: person.title,
+            linkedinUrl: person.linkedinUrl || null,
+            email: null,
+            phone: null,
+            saved: false,
+          });
         });
       }
     }

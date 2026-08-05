@@ -130,7 +130,7 @@ export default function App() {
   // saves each to localStorage (via contactStorage.js) so the business's full
   // contact list - not just one "main" contact - survives a reload.
   const [savedContacts, setSavedContacts] = useState(() => loadSavedContacts()); // mapsUrl -> Contact[]
-  const [pendingContact, setPendingContact] = useState(null); // { mapsUrl, firstName, lastName, title, linkedinUrl }
+  const [pendingContacts, setPendingContacts] = useState(null); // { mapsUrl, people: [{ firstName, lastName, title, linkedinUrl }] }
   const [focusMapsUrl, setFocusMapsUrl] = useState(null);
 
   // Saves (or updates, matched by name) one contact into that business's saved list.
@@ -145,13 +145,11 @@ export default function App() {
     });
   }, []);
 
-  const pushToMap = useCallback((business, employee) => {
-    setPendingContact({
+  // employees: one or more { firstName, lastName, title, linkedinUrl } picked in the Prospect tab.
+  const pushToMap = useCallback((business, employees) => {
+    setPendingContacts({
       mapsUrl: business.mapsUrl,
-      firstName: employee.firstName,
-      lastName: employee.lastName,
-      title: employee.title,
-      linkedinUrl: employee.linkedinUrl || null,
+      people: employees.map((e) => ({ firstName: e.firstName, lastName: e.lastName, title: e.title, linkedinUrl: e.linkedinUrl || null })),
     });
     setFocusMapsUrl(business.mapsUrl);
     setTab('map');
@@ -219,9 +217,9 @@ export default function App() {
           onAsk={() => setTab('chat')}
           savedContacts={savedContacts}
           onSaveContact={saveContact}
-          pendingContact={pendingContact}
+          pendingContacts={pendingContacts}
           focusMapsUrl={focusMapsUrl}
-          onFocusHandled={() => { setFocusMapsUrl(null); setPendingContact(null); }}
+          onFocusHandled={() => { setFocusMapsUrl(null); setPendingContacts(null); }}
           spend={spend}
           flash={flash}
         />
