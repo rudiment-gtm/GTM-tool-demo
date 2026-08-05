@@ -28,9 +28,17 @@ export default async function handler(req, res) {
       return;
     }
 
+    // LeadMagic's other endpoints (profile-search, mobile-finder, company-search) all key
+    // LinkedIn links as "profile_url" - employee-finder's exact field name isn't verified
+    // live from this environment, so a couple of likely alternates are covered too.
     const employees = (employeeResult.data?.data || [])
       .filter((e) => e.first_name && e.last_name)
-      .map((e) => ({ firstName: e.first_name, lastName: e.last_name, title: e.title || null }));
+      .map((e) => ({
+        firstName: e.first_name,
+        lastName: e.last_name,
+        title: e.title || null,
+        linkedinUrl: e.profile_url || e.linkedin_url || e.li_url || null,
+      }));
 
     res.status(200).json({ employees });
   } catch (err) {

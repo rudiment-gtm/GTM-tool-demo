@@ -43,7 +43,11 @@ export default function MapView({
   const clusterRef = useRef(null);
   const allMarkersRef = useRef([]);
   const [selected, setSelected] = useState(null);
-  const [contactState, setContactState] = useState({}); // mapsUrl -> { loading, contact, error, notConfigured, searched }
+  // mapsUrl -> { loading, error, notConfigured, searched, contacts: { [name]: Contact } }
+  // contacts holds every person seen for that business this session - both already-saved
+  // ones (seeded from savedContacts) and in-progress ones (from "Find contacts" or a
+  // Prospect push) - since a business can have more than one associated contact.
+  const [contactState, setContactState] = useState({});
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -100,9 +104,20 @@ export default function MapView({
     return BUSINESSES.filter((b) => `${b.name} ${b.address}`.toLowerCase().includes(q)).length;
   }, [mapSearch]);
 
+  // Merges one contact into a business's local contacts map, keyed by name.
+  function mergeContact(key, name, patch) {
+    setContactState((s) => ({
+      ...s,
+      [key]: {
+        ...s[key],
+        contacts: { ...s[key]?.contacts, [name]: { ...s[key]?.contacts?.[name], ...patch } },
+      },
+    }));
+  }
+
   // A contact pushed from the Prospect tab arrives as focusMapsUrl + pendingContact
   // together (set in the same event, so this effect sees both already updated) -
-  // select that business, pan to it, and seed its contact card unrevealed.
+  // select that business, pan to it, and add it to that business's contact list unrevealed.
   useEffect(() => {
     if (!focusMapsUrl) return;
     const biz = BUSINESSES.find((b) => b.mapsUrl === focusMapsUrl);
@@ -110,97 +125,103 @@ export default function MapView({
       setSelected(biz);
       mapRef.current?.setView([biz.lat, biz.lng], Math.max(mapRef.current.getZoom() || 9, 13));
       if (pendingContact?.mapsUrl === focusMapsUrl) {
-        setContactState((s) => ({
-          ...s,
-          [focusMapsUrl]: {
-            loading: false,
-            searched: true,
-            saved: false,
-            contact: {
-              firstName: pendingContact.firstName,
-              lastName: pendingContact.lastName,
-              name: [pendingContact.firstName, pendingContact.lastName].filter(Boolean).join(' '),
-              title: pendingContact.title,
-              email: null,
-              phone: null,
-            },
-          },
-        }));
+        const name = [pendingContact.firstName, pendingContact.lastName].filter(Boolean).join(' ');
+        setContactState((s) => ({ ...s, [focusMapsUrl]: { ...s[focusMapsUrl], searched: true } }));
+        mergeContact(focusMapsUrl, name, {
+          firstName: pendingContact.firstName,
+          lastName: pendingContact.lastName,
+          name,
+          title: pendingContact.title,
+          linkedinUrl: pendingContact.linkedinUrl || null,
+          email: null,
+          phone: null,
+          saved: false,
+        });
       }
     }
     onFocusHandled?.();
   }, [focusMapsUrl]);
 
-  // Selecting a business that already has a saved contact (from a previous session,
-  // via localStorage) seeds the panel from it, unless this session already has
-  // fresher local state for it (e.g. an in-progress reveal).
+  // Selecting a business that already has saved contacts (from a previous session,
+  // via localStorage) adds them to the local contacts map, without clobbering
+  // anything this session has already found/pushed for it.
   useEffect(() => {
     if (!selected) return;
     const key = selected.mapsUrl;
+    const saved = savedContacts?.[key];
+    if (!saved?.length) return;
     setContactState((s) => {
-      if (s[key] || !savedContacts?.[key]) return s;
-      return { ...s, [key]: { loading: false, searched: true, saved: true, contact: savedContacts[key] } };
+      const existing = s[key]?.contacts || {};
+      const additions = saved.filter((c) => !existing[c.name]);
+      if (!additions.length) return s;
+      const contacts = { ...existing };
+      additions.forEach((c) => { contacts[c.name] = { ...c, saved: true }; });
+      return { ...s, [key]: { ...s[key], searched: true, contacts } };
     });
   }, [selected, savedContacts]);
 
   const handleFindContacts = async (business) => {
     const key = business.mapsUrl;
-    setContactState((s) => ({ ...s, [key]: { loading: true } }));
+    setContactState((s) => ({ ...s, [key]: { ...s[key], loading: true } }));
     try {
       const data = await findContacts(business);
+      const found = data.contacts?.[0];
       setContactState((s) => ({
         ...s,
-        [key]: { loading: false, searched: true, notConfigured: !!data.notConfigured, contact: data.contacts?.[0] || null },
+        [key]: { ...s[key], loading: false, searched: true, notConfigured: !!data.notConfigured },
       }));
+      if (found) mergeContact(key, found.name, { ...found, saved: contactState[key]?.contacts?.[found.name]?.saved || false });
     } catch {
-      setContactState((s) => ({ ...s, [key]: { loading: false, error: true } }));
+      setContactState((s) => ({ ...s, [key]: { ...s[key], loading: false, error: true } }));
     }
   };
 
-  const handleRevealEmail = async (business) => {
+  const handleRevealEmail = async (business, name) => {
     const key = business.mapsUrl;
-    const contact = contactState[key]?.contact;
+    const contact = contactState[key]?.contacts?.[name];
     if (!contact?.firstName || !contact?.lastName) return;
-    setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: true } }));
+    mergeContact(key, name, { revealingEmail: true });
     try {
       const data = await revealContactField({ business, contact, field: 'email' });
       if (data.notConfigured) {
-        setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: false, notConfiguredReveal: true } }));
+        mergeContact(key, name, { revealingEmail: false, notConfiguredReveal: true });
         return;
       }
       spend?.(1);
       flash?.(data.email ? '1 credit used - email revealed' : '1 credit used - no email found');
-      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: false, contact: { ...s[key].contact, email: data.email || null } } }));
+      mergeContact(key, name, { revealingEmail: false, email: data.email || null });
     } catch {
-      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: false, revealError: true } }));
+      mergeContact(key, name, { revealingEmail: false, revealError: true });
     }
   };
 
-  const handleRevealPhone = async (business) => {
+  const handleRevealPhone = async (business, name) => {
     const key = business.mapsUrl;
-    const contact = contactState[key]?.contact;
+    const contact = contactState[key]?.contacts?.[name];
     if (!contact?.email) return;
-    setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: true } }));
+    mergeContact(key, name, { revealingPhone: true });
     try {
       const data = await revealContactField({ business, contact, field: 'phone' });
       if (data.notConfigured) {
-        setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: false, notConfiguredReveal: true } }));
+        mergeContact(key, name, { revealingPhone: false, notConfiguredReveal: true });
         return;
       }
       spend?.(1);
       flash?.(data.phone ? '1 credit used - phone revealed' : '1 credit used - no phone found');
-      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: false, contact: { ...s[key].contact, phone: data.phone || null } } }));
+      mergeContact(key, name, { revealingPhone: false, phone: data.phone || null });
     } catch {
-      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: false, revealError: true } }));
+      mergeContact(key, name, { revealingPhone: false, revealError: true });
     }
   };
 
-  const handleSaveContact = (business) => {
+  const handleSaveContact = (business, name) => {
     const key = business.mapsUrl;
-    const contact = contactState[key]?.contact;
+    const contact = contactState[key]?.contacts?.[name];
     if (!contact) return;
-    onSaveContact?.(key, contact);
-    setContactState((s) => ({ ...s, [key]: { ...s[key], saved: true } }));
+    // Only persist real contact fields - not this session's transient reveal/loading flags.
+    const { revealingEmail, revealingPhone, notConfiguredReveal, revealError, saved, ...persistable } = contact;
+    onSaveContact?.(key, persistable);
+    mergeContact(key, name, { saved: true });
     flash?.('Contact saved');
   };
 

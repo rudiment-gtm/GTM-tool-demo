@@ -81,6 +81,7 @@ export default async function handler(req, res) {
         lastName: best.last_name,
         name: [best.first_name, best.last_name].filter(Boolean).join(' '),
         title: best.title || null,
+        linkedinUrl: best.profile_url || best.linkedin_url || best.li_url || null,
         email,
         phone,
       }],

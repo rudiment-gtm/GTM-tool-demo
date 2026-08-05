@@ -144,6 +144,16 @@ export default function ProspectView({ onPushToMap, spend, flash }) {
                               <div>
                                 <div style={{ color: '#EDEDEA', fontSize: 12.5 }}>{e.firstName} {e.lastName}</div>
                                 {e.title && <div style={{ color: C.textDim, fontSize: 11 }}>{e.title}</div>}
+                                {e.linkedinUrl && (
+                                  <a
+                                    href={/^https?:\/\//.test(e.linkedinUrl) ? e.linkedinUrl : `https://${e.linkedinUrl}`}
+                                    target="_blank" rel="noopener noreferrer"
+                                    onClick={(ev) => ev.stopPropagation()}
+                                    style={{ color: C.green, fontSize: 10.5 }}
+                                  >
+                                    LinkedIn
+                                  </a>
+                                )}
                               </div>
                               <div
                                 onClick={() => { onPushToMap(b, e); flash?.(`Pushed ${e.firstName} ${e.lastName} to the Map tab`); }}

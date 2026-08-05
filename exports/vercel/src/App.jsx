@@ -125,24 +125,34 @@ export default function App() {
   }, [flash, setTab]);
 
   // prospect -> map contact handoff -------------------------------------
-  // Prospect tab looks up real employees per business and lets a rep push one
-  // over to the Map tab; Map tab reveals email/phone on demand and saves the
-  // result to localStorage (via contactStorage.js) so it survives a reload.
-  const [savedContacts, setSavedContacts] = useState(() => loadSavedContacts());
-  const [pendingContact, setPendingContact] = useState(null); // { mapsUrl, firstName, lastName, title }
+  // Prospect tab looks up real employees per business and lets a rep push any
+  // of them over to the Map tab; Map tab reveals email/phone on demand and
+  // saves each to localStorage (via contactStorage.js) so the business's full
+  // contact list - not just one "main" contact - survives a reload.
+  const [savedContacts, setSavedContacts] = useState(() => loadSavedContacts()); // mapsUrl -> Contact[]
+  const [pendingContact, setPendingContact] = useState(null); // { mapsUrl, firstName, lastName, title, linkedinUrl }
   const [focusMapsUrl, setFocusMapsUrl] = useState(null);
 
+  // Saves (or updates, matched by name) one contact into that business's saved list.
   const saveContact = useCallback((mapsUrl, contact) => {
     setSavedContacts((prev) => {
-      const next = { ...prev, [mapsUrl]: contact };
+      const existing = prev[mapsUrl] || [];
+      const i = existing.findIndex((c) => c.name === contact.name);
+      const list = i >= 0 ? existing.map((c, n) => (n === i ? contact : c)) : [...existing, contact];
+      const next = { ...prev, [mapsUrl]: list };
       persistSavedContacts(next);
       return next;
     });
-    setPendingContact((p) => (p?.mapsUrl === mapsUrl ? null : p));
   }, []);
 
   const pushToMap = useCallback((business, employee) => {
-    setPendingContact({ mapsUrl: business.mapsUrl, firstName: employee.firstName, lastName: employee.lastName, title: employee.title });
+    setPendingContact({
+      mapsUrl: business.mapsUrl,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      title: employee.title,
+      linkedinUrl: employee.linkedinUrl || null,
+    });
     setFocusMapsUrl(business.mapsUrl);
     setTab('map');
   }, [setTab]);
@@ -211,7 +221,7 @@ export default function App() {
           onSaveContact={saveContact}
           pendingContact={pendingContact}
           focusMapsUrl={focusMapsUrl}
-          onFocusHandled={() => setFocusMapsUrl(null)}
+          onFocusHandled={() => { setFocusMapsUrl(null); setPendingContact(null); }}
           spend={spend}
           flash={flash}
         />

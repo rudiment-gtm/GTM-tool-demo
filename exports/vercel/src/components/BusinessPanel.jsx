@@ -5,15 +5,88 @@ function initials(name) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 }
 
+function externalUrl(url) {
+  return /^https?:\/\//.test(url) ? url : `https://${url}`;
+}
+
 const row = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid ' + C.border };
 const rowLabel = { color: C.textDim, fontSize: 12 };
 const rowValue = { color: '#EDEDEA', fontSize: 12.5, textAlign: 'right', maxWidth: 220 };
+
+function ContactCard({ contact, onRevealEmail, onRevealPhone, onSaveContact }) {
+  return (
+    <div style={{ background: C.card, border: '1px solid ' + C.borderStrong, borderRadius: 10, padding: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1F6F45', color: '#DFF7E8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600 }}>
+            {initials(contact.name || '?')}
+          </div>
+          <div>
+            <div style={{ color: '#EDEDEA', fontSize: 12.5, fontWeight: 600 }}>{contact.name}</div>
+            {contact.title && <div style={{ color: C.textDim, fontSize: 11 }}>{contact.title}</div>}
+          </div>
+        </div>
+        {contact.saved && <span style={{ color: C.green, fontSize: 10.5 }}>Saved &#10003;</span>}
+      </div>
+
+      {contact.linkedinUrl && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+          <span style={{ color: C.textDim, fontSize: 11.5 }}>LinkedIn</span>
+          <a href={externalUrl(contact.linkedinUrl)} target="_blank" rel="noopener noreferrer" style={{ color: C.green, fontSize: 11.5 }}>View profile</a>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+        <span style={{ color: C.textDim, fontSize: 11.5 }}>Email</span>
+        {contact.email ? (
+          <span style={{ color: C.textBody, fontSize: 12 }}>{contact.email}</span>
+        ) : contact.notConfiguredReveal ? (
+          <span style={{ color: C.textFaint, fontSize: 11.5 }}>Not connected</span>
+        ) : contact.firstName && contact.lastName ? (
+          <span
+            onClick={contact.revealingEmail ? undefined : onRevealEmail}
+            style={{ color: contact.revealingEmail ? C.textDim : C.green, fontSize: 11.5, cursor: contact.revealingEmail ? 'default' : 'pointer' }}
+          >
+            {contact.revealingEmail ? 'Revealing…' : 'Reveal email'}
+          </span>
+        ) : (
+          <span style={{ color: C.textFaint, fontSize: 11.5 }}>—</span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+        <span style={{ color: C.textDim, fontSize: 11.5 }}>Mobile</span>
+        {contact.phone ? (
+          <span style={{ color: C.textBody, fontSize: 12 }}>{contact.phone}</span>
+        ) : contact.notConfiguredReveal ? (
+          <span style={{ color: C.textFaint, fontSize: 11.5 }}>Not connected</span>
+        ) : contact.email ? (
+          <span
+            onClick={contact.revealingPhone ? undefined : onRevealPhone}
+            style={{ color: contact.revealingPhone ? C.textDim : C.green, fontSize: 11.5, cursor: contact.revealingPhone ? 'default' : 'pointer' }}
+          >
+            {contact.revealingPhone ? 'Revealing…' : 'Reveal mobile'}
+          </span>
+        ) : (
+          <span style={{ color: C.textFaint, fontSize: 11.5 }}>Reveal email first</span>
+        )}
+      </div>
+
+      <div
+        onClick={onSaveContact}
+        style={{ marginTop: 10, textAlign: 'center', border: '1px solid ' + C.borderStrong, borderRadius: 8, padding: '7px 12px', fontSize: 11.5, color: C.textBody, cursor: 'pointer' }}
+      >
+        {contact.saved ? 'Update saved contact' : 'Save contact'}
+      </div>
+    </div>
+  );
+}
 
 export default function BusinessPanel({ business, contactState, onFindContacts, onRevealEmail, onRevealPhone, onSaveContact, onClose }) {
   if (!business) return null;
   const b = business;
   const state = contactState || {};
-  const contact = state.contact;
+  const contacts = Object.values(state.contacts || {});
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`;
 
   return (
@@ -39,7 +112,7 @@ export default function BusinessPanel({ business, contactState, onFindContacts, 
       <div style={row}>
         <span style={rowLabel}>Website</span>
         <span style={rowValue}>
-          {b.website ? <a href={/^https?:\/\//.test(b.website) ? b.website : `https://${b.website}`} target="_blank" rel="noopener noreferrer" style={{ color: C.green }}>{b.website.replace(/^https?:\/\//, '')}</a> : '—'}
+          {b.website ? <a href={externalUrl(b.website)} target="_blank" rel="noopener noreferrer" style={{ color: C.green }}>{b.website.replace(/^https?:\/\//, '')}</a> : '—'}
         </span>
       </div>
       <div style={{ ...row, borderBottom: 'none', alignItems: 'flex-start' }}>
@@ -47,68 +120,24 @@ export default function BusinessPanel({ business, contactState, onFindContacts, 
         <span style={rowValue}>{b.address}</span>
       </div>
 
-      <div style={{ ...label, margin: '18px 0 10px' }}>MAIN CONTACT</div>
+      <div style={{ ...label, margin: '18px 0 10px' }}>CONTACTS{contacts.length > 1 ? ` (${contacts.length})` : ''}</div>
 
-      {contact ? (
-        <div style={{ background: C.card, border: '1px solid ' + C.borderStrong, borderRadius: 10, padding: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1F6F45', color: '#DFF7E8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600 }}>
-                {initials(contact.name || '?')}
-              </div>
-              <div>
-                <div style={{ color: '#EDEDEA', fontSize: 12.5, fontWeight: 600 }}>{contact.name}</div>
-                {contact.title && <div style={{ color: C.textDim, fontSize: 11 }}>{contact.title}</div>}
-              </div>
-            </div>
-            {state.saved && <span style={{ color: C.green, fontSize: 10.5 }}>Saved &#10003;</span>}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ color: C.textDim, fontSize: 11.5 }}>Email</span>
-            {contact.email ? (
-              <span style={{ color: C.textBody, fontSize: 12 }}>{contact.email}</span>
-            ) : state.notConfiguredReveal ? (
-              <span style={{ color: C.textFaint, fontSize: 11.5 }}>Not connected</span>
-            ) : contact.firstName && contact.lastName ? (
-              <span
-                onClick={state.revealingEmail ? undefined : () => onRevealEmail(b)}
-                style={{ color: state.revealingEmail ? C.textDim : C.green, fontSize: 11.5, cursor: state.revealingEmail ? 'default' : 'pointer' }}
-              >
-                {state.revealingEmail ? 'Revealing…' : 'Reveal email'}
-              </span>
-            ) : (
-              <span style={{ color: C.textFaint, fontSize: 11.5 }}>—</span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ color: C.textDim, fontSize: 11.5 }}>Mobile</span>
-            {contact.phone ? (
-              <span style={{ color: C.textBody, fontSize: 12 }}>{contact.phone}</span>
-            ) : state.notConfiguredReveal ? (
-              <span style={{ color: C.textFaint, fontSize: 11.5 }}>Not connected</span>
-            ) : contact.email ? (
-              <span
-                onClick={state.revealingPhone ? undefined : () => onRevealPhone(b)}
-                style={{ color: state.revealingPhone ? C.textDim : C.green, fontSize: 11.5, cursor: state.revealingPhone ? 'default' : 'pointer' }}
-              >
-                {state.revealingPhone ? 'Revealing…' : 'Reveal mobile'}
-              </span>
-            ) : (
-              <span style={{ color: C.textFaint, fontSize: 11.5 }}>Reveal email first</span>
-            )}
-          </div>
-
-          <div
-            onClick={() => onSaveContact(b)}
-            style={{ marginTop: 10, textAlign: 'center', border: '1px solid ' + C.borderStrong, borderRadius: 8, padding: '7px 12px', fontSize: 11.5, color: C.textBody, cursor: 'pointer' }}
-          >
-            {state.saved ? 'Update saved contact' : 'Save contact'}
-          </div>
+      {contacts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
+          {contacts.map((contact) => (
+            <ContactCard
+              key={contact.name}
+              contact={contact}
+              onRevealEmail={() => onRevealEmail(b, contact.name)}
+              onRevealPhone={() => onRevealPhone(b, contact.name)}
+              onSaveContact={() => onSaveContact(b, contact.name)}
+            />
+          ))}
         </div>
-      ) : (
-        <div>
+      )}
+
+      <div>
+        {contacts.length === 0 && (
           <div style={{ color: C.textDim, fontSize: 12, marginBottom: 10 }}>
             {state.notConfigured
               ? 'LeadMagic isn’t connected yet — add LEADMAGIC_API_KEY in the Vercel project to enable live contact search.'
@@ -116,20 +145,20 @@ export default function BusinessPanel({ business, contactState, onFindContacts, 
                 ? 'Couldn’t reach LeadMagic. Try again in a moment.'
                 : state.searched
                   ? 'No contact found for this business yet.'
-                  : 'No contact on file yet.'}
+                  : 'No contacts on file yet.'}
           </div>
-          <div
-            onClick={state.loading ? undefined : () => onFindContacts(b)}
-            style={{
-              textAlign: 'center', background: state.loading ? C.card : C.green, color: state.loading ? C.textDim : C.greenText,
-              borderRadius: 8, padding: '9px 12px', fontSize: 12.5, fontWeight: 600,
-              cursor: state.loading ? 'default' : 'pointer', border: '1px solid ' + (state.loading ? C.borderStrong : C.green),
-            }}
-          >
-            {state.loading ? 'Searching…' : 'Find contacts'}
-          </div>
+        )}
+        <div
+          onClick={state.loading ? undefined : () => onFindContacts(b)}
+          style={{
+            textAlign: 'center', background: state.loading ? C.card : C.green, color: state.loading ? C.textDim : C.greenText,
+            borderRadius: 8, padding: '9px 12px', fontSize: 12.5, fontWeight: 600,
+            cursor: state.loading ? 'default' : 'pointer', border: '1px solid ' + (state.loading ? C.borderStrong : C.green),
+          }}
+        >
+          {state.loading ? 'Searching…' : contacts.length > 0 ? 'Find another contact' : 'Find contacts'}
         </div>
-      )}
+      </div>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
         <a href={directionsUrl} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', border: '1px solid ' + C.borderStrong, borderRadius: 8, padding: '9px 12px', fontSize: 12, color: C.textBody }}>
