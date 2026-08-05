@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet.markercluster';
 import { C } from '../theme.js';
 import { BUSINESSES } from '../data.js';
-import { findContacts } from '../services/leadmagic.js';
+import { findContacts, revealContactField } from '../services/leadmagic.js';
 import BusinessPanel from '../components/BusinessPanel.jsx';
 
 // Standard OSM raster tiles - free, no key, reliable at real-world traffic.
@@ -34,13 +34,20 @@ function clusterIcon(cluster) {
   });
 }
 
-export default function MapView({ active, pinned, clearPinned, mapSearch, setMapSearch, onSync, onSurrounding, onAsk }) {
+export default function MapView({
+  active, pinned, clearPinned, mapSearch, setMapSearch, onSync, onSurrounding, onAsk,
+  savedContacts, onSaveContact, pendingContacts, focusMapsUrl, onFocusHandled, spend, flash,
+}) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const clusterRef = useRef(null);
   const allMarkersRef = useRef([]);
   const [selected, setSelected] = useState(null);
-  const [contactState, setContactState] = useState({}); // mapsUrl -> { loading, contact, error, notConfigured, searched }
+  // mapsUrl -> { loading, error, notConfigured, searched, contacts: { [name]: Contact } }
+  // contacts holds every person seen for that business this session - both already-saved
+  // ones (seeded from savedContacts) and in-progress ones (from "Find contacts" or a
+  // Prospect push) - since a business can have more than one associated contact.
+  const [contactState, setContactState] = useState({});
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -97,18 +104,127 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
     return BUSINESSES.filter((b) => `${b.name} ${b.address}`.toLowerCase().includes(q)).length;
   }, [mapSearch]);
 
+  // Merges one contact into a business's local contacts map, keyed by name.
+  function mergeContact(key, name, patch) {
+    setContactState((s) => ({
+      ...s,
+      [key]: {
+        ...s[key],
+        contacts: { ...s[key]?.contacts, [name]: { ...s[key]?.contacts?.[name], ...patch } },
+      },
+    }));
+  }
+
+  // One or more contacts pushed from the Prospect tab arrive as focusMapsUrl + pendingContacts
+  // together (set in the same event, so this effect sees both already updated) -
+  // select that business, pan to it, and add each person to its contact list unrevealed.
+  useEffect(() => {
+    if (!focusMapsUrl) return;
+    const biz = BUSINESSES.find((b) => b.mapsUrl === focusMapsUrl);
+    if (biz) {
+      setSelected(biz);
+      mapRef.current?.setView([biz.lat, biz.lng], Math.max(mapRef.current.getZoom() || 9, 13));
+      if (pendingContacts?.mapsUrl === focusMapsUrl) {
+        setContactState((s) => ({ ...s, [focusMapsUrl]: { ...s[focusMapsUrl], searched: true } }));
+        pendingContacts.people.forEach((person) => {
+          const name = [person.firstName, person.lastName].filter(Boolean).join(' ');
+          mergeContact(focusMapsUrl, name, {
+            firstName: person.firstName,
+            lastName: person.lastName,
+            name,
+            title: person.title,
+            linkedinUrl: person.linkedinUrl || null,
+            email: null,
+            phone: null,
+            saved: false,
+          });
+        });
+      }
+    }
+    onFocusHandled?.();
+  }, [focusMapsUrl]);
+
+  // Selecting a business that already has saved contacts (from a previous session,
+  // via localStorage) adds them to the local contacts map, without clobbering
+  // anything this session has already found/pushed for it.
+  useEffect(() => {
+    if (!selected) return;
+    const key = selected.mapsUrl;
+    const saved = savedContacts?.[key];
+    if (!saved?.length) return;
+    setContactState((s) => {
+      const existing = s[key]?.contacts || {};
+      const additions = saved.filter((c) => !existing[c.name]);
+      if (!additions.length) return s;
+      const contacts = { ...existing };
+      additions.forEach((c) => { contacts[c.name] = { ...c, saved: true }; });
+      return { ...s, [key]: { ...s[key], searched: true, contacts } };
+    });
+  }, [selected, savedContacts]);
+
   const handleFindContacts = async (business) => {
     const key = business.mapsUrl;
-    setContactState((s) => ({ ...s, [key]: { loading: true } }));
+    setContactState((s) => ({ ...s, [key]: { ...s[key], loading: true } }));
     try {
       const data = await findContacts(business);
+      const found = data.contacts?.[0];
       setContactState((s) => ({
         ...s,
-        [key]: { loading: false, searched: true, notConfigured: !!data.notConfigured, contact: data.contacts?.[0] || null },
+        [key]: { ...s[key], loading: false, searched: true, notConfigured: !!data.notConfigured },
       }));
+      if (found) mergeContact(key, found.name, { ...found, saved: contactState[key]?.contacts?.[found.name]?.saved || false });
     } catch {
-      setContactState((s) => ({ ...s, [key]: { loading: false, error: true } }));
+      setContactState((s) => ({ ...s, [key]: { ...s[key], loading: false, error: true } }));
     }
+  };
+
+  const handleRevealEmail = async (business, name) => {
+    const key = business.mapsUrl;
+    const contact = contactState[key]?.contacts?.[name];
+    if (!contact?.firstName || !contact?.lastName) return;
+    mergeContact(key, name, { revealingEmail: true });
+    try {
+      const data = await revealContactField({ business, contact, field: 'email' });
+      if (data.notConfigured) {
+        mergeContact(key, name, { revealingEmail: false, notConfiguredReveal: true });
+        return;
+      }
+      spend?.(1);
+      flash?.(data.email ? '1 credit used - email revealed' : '1 credit used - no email found');
+      mergeContact(key, name, { revealingEmail: false, email: data.email || null });
+    } catch {
+      mergeContact(key, name, { revealingEmail: false, revealError: true });
+    }
+  };
+
+  const handleRevealPhone = async (business, name) => {
+    const key = business.mapsUrl;
+    const contact = contactState[key]?.contacts?.[name];
+    if (!contact?.email) return;
+    mergeContact(key, name, { revealingPhone: true });
+    try {
+      const data = await revealContactField({ business, contact, field: 'phone' });
+      if (data.notConfigured) {
+        mergeContact(key, name, { revealingPhone: false, notConfiguredReveal: true });
+        return;
+      }
+      spend?.(1);
+      flash?.(data.phone ? '1 credit used - phone revealed' : '1 credit used - no phone found');
+      mergeContact(key, name, { revealingPhone: false, phone: data.phone || null });
+    } catch {
+      mergeContact(key, name, { revealingPhone: false, revealError: true });
+    }
+  };
+
+  const handleSaveContact = (business, name) => {
+    const key = business.mapsUrl;
+    const contact = contactState[key]?.contacts?.[name];
+    if (!contact) return;
+    // Only persist real contact fields - not this session's transient reveal/loading flags.
+    const { revealingEmail, revealingPhone, notConfiguredReveal, revealError, saved, ...persistable } = contact;
+    onSaveContact?.(key, persistable);
+    mergeContact(key, name, { saved: true });
+    flash?.('Contact saved');
   };
 
   return (
@@ -166,6 +282,9 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
         business={selected}
         contactState={selected ? contactState[selected.mapsUrl] : null}
         onFindContacts={handleFindContacts}
+        onRevealEmail={handleRevealEmail}
+        onRevealPhone={handleRevealPhone}
+        onSaveContact={handleSaveContact}
         onClose={() => setSelected(null)}
       />
     </div>
