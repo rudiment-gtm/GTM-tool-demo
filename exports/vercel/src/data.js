@@ -104,24 +104,6 @@ Formatting rules - the chat UI renders your reply as plain text or as a data tab
   Include at most 20 rows in the array even if "total" is larger - never list more than 20, summarize the rest in "text" instead.
 - For every other kind of question (advice, comparisons, strategy, yes/no, anything not a literal list of businesses), reply in plain text only - do not use the JSON shape.`;
 
-export const CONTACTS = [
-  { name: 'Dana Whitmore', title: 'Director of Facilities', email: 'd.whitmore@silverlakebp.com', phone: '(801) 555-0142', revealed: true },
-  { name: 'Marcus Field', title: 'Property Manager', email: 'm.field@silverlakebp.com', phone: '(801) 555-0187', revealed: false },
-  { name: 'Priya Raman', title: 'VP Operations', email: 'p.raman@silverlakebp.com', phone: '(801) 555-0119', revealed: false },
-  { name: 'Owen Castillo', title: 'Grounds Supervisor', email: 'o.castillo@silverlakebp.com', phone: '(801) 555-0166', revealed: false },
-  { name: 'Beth Nakagawa', title: 'Regional Controller', email: 'b.nakagawa@silverlakebp.com', phone: '(801) 555-0173', revealed: false },
-  { name: 'Trent Alvarez', title: 'Site Manager', email: 't.alvarez@silverlakebp.com', phone: '(801) 555-0128', revealed: false },
-];
-
-export const COMPANY_PROFILE = [
-  { k: 'Industry', v: 'Property mgmt' },
-  { k: 'Employees', v: '120-250' },
-  { k: 'Revenue', v: '$28M est.' },
-  { k: 'Locations', v: '4 in UT' },
-  { k: 'Turf area', v: '6.2 acres' },
-  { k: 'Website', v: 'silverlakebp.com' },
-];
-
 export const FILTER_OPTIONS = {
   Status: ['Active', 'Canceled', 'Paused', 'Lead'],
   Services: ['Mowing', 'Fertilization', 'Irrigation', 'Snow removal'],

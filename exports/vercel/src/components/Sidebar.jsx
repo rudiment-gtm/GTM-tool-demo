@@ -7,7 +7,7 @@ const TABS = [
   { id: 'chat', label: 'Chat' },
   { id: 'map', label: 'Map' },
   { id: 'prospect', label: 'Prospect' },
-  { id: 'enrich', label: 'Enrich' },
+  { id: 'contacts', label: 'Contacts' },
 ];
 
 const navItem = { padding: '9px 10px', borderRadius: 8, color: '#B9BCC2', fontSize: 13, cursor: 'pointer' };
@@ -27,7 +27,9 @@ function Stat({ value, label }) {
   );
 }
 
-export default function Sidebar({ tab, setTab, credits, monthly, showing, groups, applyGroups, addGroup, recentOpen, newChat }) {
+export default function Sidebar({ tab, setTab, credits, monthly, showing, groups, applyGroups, addGroup, recentOpen, newChat, savedContacts }) {
+  const savedContactCount = Object.values(savedContacts || {}).reduce((n, list) => n + list.length, 0);
+  const savedBusinessCount = Object.keys(savedContacts || {}).length;
   const onTabKey = (e, i) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
     e.preventDefault();
@@ -153,16 +155,15 @@ export default function Sidebar({ tab, setTab, credits, monthly, showing, groups
           </>
         )}
 
-        {tab === 'enrich' && (
+        {tab === 'contacts' && (
           <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0 12px' }}>
-              <div style={navItemActive}>Company lookup</div>
-              <div style={navItem}>Bulk enrich</div>
-              <div style={navItem}>Enrichment history</div>
+            <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
+              <Stat value={savedContactCount} label="Saved Contacts" />
+              <Stat value={savedBusinessCount} label="Companies" />
             </div>
             <div style={{ padding: '18px 16px 8px', color: C.textMute, fontSize: 10.5, fontFamily: mono, letterSpacing: '.12em' }}>CREDIT COSTS</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '0 16px' }}>
-              {[['Company profile', 1], ['Contact + email', 2], ['Direct dial', 4]].map(([k, v]) => (
+              {[['Employee search', 1], ['Reveal email', 1], ['Reveal mobile', 1]].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', color: C.textDim, fontSize: 11.5 }}>
                   <span>{k}</span><span style={{ color: C.textBody }}>{v}</span>
                 </div>

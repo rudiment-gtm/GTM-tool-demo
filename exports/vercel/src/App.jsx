@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { C } from './theme.js';
-import { CLAUDE_MODEL_IDS, CONTACTS, COUNTS, MAP_CHAT_SYSTEM, TOTAL_ACCOUNTS, pickReply } from './data.js';
+import { CLAUDE_MODEL_IDS, COUNTS, MAP_CHAT_SYSTEM, TOTAL_ACCOUNTS, pickReply } from './data.js';
 import Sidebar from './components/Sidebar.jsx';
 import MapView from './views/MapView.jsx';
 import ChatView from './views/ChatView.jsx';
 import ProspectView from './views/ProspectView.jsx';
-import EnrichView from './views/EnrichView.jsx';
+import ContactsView from './views/ContactsView.jsx';
 import Toast from './components/Toast.jsx';
 import { loadSavedContacts, persistSavedContacts } from './services/contactStorage.js';
 
 const MONTHLY_CREDITS = 5000;
-const TABS = ['chat', 'map', 'prospect', 'enrich'];
+const TABS = ['chat', 'map', 'prospect', 'contacts'];
 
 function countFor(groups) {
   if (!groups.length) return TOTAL_ACCOUNTS;
@@ -47,8 +47,6 @@ export default function App() {
 
   // credits ------------------------------------------------------------
   const [credits, setCredits] = useState(4180);
-  const [companiesEnriched] = useState(214);
-  const [contactsRevealed, setContactsRevealed] = useState(303);
   const spend = useCallback((n) => setCredits((c) => Math.max(0, c - n)), []);
 
   // map ----------------------------------------------------------------
@@ -155,37 +153,11 @@ export default function App() {
     setTab('map');
   }, [setTab]);
 
-  // enrich -------------------------------------------------------------
-  const [contacts, setContacts] = useState(() => CONTACTS.map((c) => ({ ...c })));
-  const [company, setCompany] = useState('Silver Lake Business Park');
-  const [companyOrigin, setCompanyOrigin] = useState('from map - Lehi, UT');
-  const [enrichQuery, setEnrichQuery] = useState('');
-
-  const revealContact = useCallback((i) => {
-    setContacts((list) => {
-      if (list[i].revealed) return list;
-      spend(2);
-      setContactsRevealed((n) => n + 1);
-      flash('2 credits used - contact revealed');
-      return list.map((c, n) => (n === i ? { ...c, revealed: true } : c));
-    });
-  }, [flash, spend]);
-
-  const revealAll = useCallback(() => {
-    setContacts((list) => {
-      const locked = list.filter((c) => !c.revealed).length;
-      if (!locked) return list;
-      spend(locked * 2);
-      setContactsRevealed((n) => n + locked);
-      flash(locked * 2 + ' credits used - ' + locked + ' contacts revealed');
-      return list.map((c) => ({ ...c, revealed: true }));
-    });
-  }, [flash, spend]);
-
-  const openEnrich = useCallback((name, origin) => {
-    setCompany(name);
-    setCompanyOrigin(origin);
-    setTab('enrich');
+  // Jumps to the Map tab and opens the given business - MapView's own effects
+  // pick its saved contacts back up from savedContacts once selected.
+  const viewContactOnMap = useCallback((mapsUrl) => {
+    setFocusMapsUrl(mapsUrl);
+    setTab('map');
   }, [setTab]);
 
   return (
@@ -201,6 +173,7 @@ export default function App() {
         addGroup={() => applyGroups([...groups, { id: nextGroupId.current++, field: 'Services', value: 'Mowing' }])}
         recentOpen={(title) => { setMessages([]); setChatTitle(title); setTab('chat'); send(title); }}
         newChat={() => { setMessages([]); setChatTitle('New chat'); }}
+        savedContacts={savedContacts}
       />
 
       <div style={{ flex: 1, position: 'relative', minWidth: 0, background: C.surface }}>
@@ -213,7 +186,7 @@ export default function App() {
           mapSearch={mapSearch}
           setMapSearch={setMapSearch}
           onSync={() => flash('Syncing from Clay - 2,773 accounts up to date')}
-          onSurrounding={() => { openEnrich('Silver Lake Business Park', 'from map - Lehi, UT'); flash('3 businesses found nearby'); }}
+          onSurrounding={() => flash('3 businesses found nearby')}
           onAsk={() => setTab('chat')}
           savedContacts={savedContacts}
           onSaveContact={saveContact}
@@ -243,24 +216,11 @@ export default function App() {
           <ProspectView onPushToMap={pushToMap} spend={spend} flash={flash} />
         )}
 
-        {tab === 'enrich' && (
-          <EnrichView
-            company={company}
-            origin={companyOrigin}
-            query={enrichQuery}
-            setQuery={setEnrichQuery}
-            contacts={contacts}
-            credits={credits}
-            monthly={MONTHLY_CREDITS}
-            companiesEnriched={companiesEnriched}
-            contactsRevealed={contactsRevealed}
-            onReveal={revealContact}
-            onRevealAll={revealAll}
-            onFind={() => flash('6 contacts found - 1 credit used')}
-            onPushCrm={() => flash('Pushed to CRM')}
+        {tab === 'contacts' && (
+          <ContactsView
+            savedContacts={savedContacts}
+            onViewOnMap={viewContactOnMap}
             onExport={() => flash('CSV exported')}
-            onDraft={() => { setTab('chat'); send('Draft outreach to Dana Whitmore at Silver Lake Business Park'); }}
-            onBuy={() => flash('Opening billing - add 5,000 credits')}
           />
         )}
 
