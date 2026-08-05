@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet.markercluster';
 import { C } from '../theme.js';
 import { BUSINESSES } from '../data.js';
-import { findContacts } from '../services/leadmagic.js';
+import { findContacts, revealContactField } from '../services/leadmagic.js';
 import BusinessPanel from '../components/BusinessPanel.jsx';
 
 // Standard OSM raster tiles - free, no key, reliable at real-world traffic.
@@ -34,7 +34,10 @@ function clusterIcon(cluster) {
   });
 }
 
-export default function MapView({ active, pinned, clearPinned, mapSearch, setMapSearch, onSync, onSurrounding, onAsk }) {
+export default function MapView({
+  active, pinned, clearPinned, mapSearch, setMapSearch, onSync, onSurrounding, onAsk,
+  savedContacts, onSaveContact, pendingContact, focusMapsUrl, onFocusHandled, spend, flash,
+}) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const clusterRef = useRef(null);
@@ -97,6 +100,49 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
     return BUSINESSES.filter((b) => `${b.name} ${b.address}`.toLowerCase().includes(q)).length;
   }, [mapSearch]);
 
+  // A contact pushed from the Prospect tab arrives as focusMapsUrl + pendingContact
+  // together (set in the same event, so this effect sees both already updated) -
+  // select that business, pan to it, and seed its contact card unrevealed.
+  useEffect(() => {
+    if (!focusMapsUrl) return;
+    const biz = BUSINESSES.find((b) => b.mapsUrl === focusMapsUrl);
+    if (biz) {
+      setSelected(biz);
+      mapRef.current?.setView([biz.lat, biz.lng], Math.max(mapRef.current.getZoom() || 9, 13));
+      if (pendingContact?.mapsUrl === focusMapsUrl) {
+        setContactState((s) => ({
+          ...s,
+          [focusMapsUrl]: {
+            loading: false,
+            searched: true,
+            saved: false,
+            contact: {
+              firstName: pendingContact.firstName,
+              lastName: pendingContact.lastName,
+              name: [pendingContact.firstName, pendingContact.lastName].filter(Boolean).join(' '),
+              title: pendingContact.title,
+              email: null,
+              phone: null,
+            },
+          },
+        }));
+      }
+    }
+    onFocusHandled?.();
+  }, [focusMapsUrl]);
+
+  // Selecting a business that already has a saved contact (from a previous session,
+  // via localStorage) seeds the panel from it, unless this session already has
+  // fresher local state for it (e.g. an in-progress reveal).
+  useEffect(() => {
+    if (!selected) return;
+    const key = selected.mapsUrl;
+    setContactState((s) => {
+      if (s[key] || !savedContacts?.[key]) return s;
+      return { ...s, [key]: { loading: false, searched: true, saved: true, contact: savedContacts[key] } };
+    });
+  }, [selected, savedContacts]);
+
   const handleFindContacts = async (business) => {
     const key = business.mapsUrl;
     setContactState((s) => ({ ...s, [key]: { loading: true } }));
@@ -109,6 +155,53 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
     } catch {
       setContactState((s) => ({ ...s, [key]: { loading: false, error: true } }));
     }
+  };
+
+  const handleRevealEmail = async (business) => {
+    const key = business.mapsUrl;
+    const contact = contactState[key]?.contact;
+    if (!contact?.firstName || !contact?.lastName) return;
+    setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: true } }));
+    try {
+      const data = await revealContactField({ business, contact, field: 'email' });
+      if (data.notConfigured) {
+        setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: false, notConfiguredReveal: true } }));
+        return;
+      }
+      spend?.(1);
+      flash?.(data.email ? '1 credit used - email revealed' : '1 credit used - no email found');
+      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: false, contact: { ...s[key].contact, email: data.email || null } } }));
+    } catch {
+      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingEmail: false, revealError: true } }));
+    }
+  };
+
+  const handleRevealPhone = async (business) => {
+    const key = business.mapsUrl;
+    const contact = contactState[key]?.contact;
+    if (!contact?.email) return;
+    setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: true } }));
+    try {
+      const data = await revealContactField({ business, contact, field: 'phone' });
+      if (data.notConfigured) {
+        setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: false, notConfiguredReveal: true } }));
+        return;
+      }
+      spend?.(1);
+      flash?.(data.phone ? '1 credit used - phone revealed' : '1 credit used - no phone found');
+      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: false, contact: { ...s[key].contact, phone: data.phone || null } } }));
+    } catch {
+      setContactState((s) => ({ ...s, [key]: { ...s[key], revealingPhone: false, revealError: true } }));
+    }
+  };
+
+  const handleSaveContact = (business) => {
+    const key = business.mapsUrl;
+    const contact = contactState[key]?.contact;
+    if (!contact) return;
+    onSaveContact?.(key, contact);
+    setContactState((s) => ({ ...s, [key]: { ...s[key], saved: true } }));
+    flash?.('Contact saved');
   };
 
   return (
@@ -166,6 +259,9 @@ export default function MapView({ active, pinned, clearPinned, mapSearch, setMap
         business={selected}
         contactState={selected ? contactState[selected.mapsUrl] : null}
         onFindContacts={handleFindContacts}
+        onRevealEmail={handleRevealEmail}
+        onRevealPhone={handleRevealPhone}
+        onSaveContact={handleSaveContact}
         onClose={() => setSelected(null)}
       />
     </div>

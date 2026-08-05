@@ -1,12 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { C } from './theme.js';
-import { CLAUDE_MODEL_IDS, CONTACTS, COUNTS, MAP_CHAT_SYSTEM, PROSPECTS, TOTAL_ACCOUNTS, pickReply } from './data.js';
+import { CLAUDE_MODEL_IDS, CONTACTS, COUNTS, MAP_CHAT_SYSTEM, TOTAL_ACCOUNTS, pickReply } from './data.js';
 import Sidebar from './components/Sidebar.jsx';
 import MapView from './views/MapView.jsx';
 import ChatView from './views/ChatView.jsx';
 import ProspectView from './views/ProspectView.jsx';
 import EnrichView from './views/EnrichView.jsx';
 import Toast from './components/Toast.jsx';
+import { loadSavedContacts, persistSavedContacts } from './services/contactStorage.js';
 
 const MONTHLY_CREDITS = 5000;
 const TABS = ['chat', 'map', 'prospect', 'enrich'];
@@ -123,12 +124,28 @@ export default function App() {
     flash('Map updated - ' + reply.count + ' accounts pinned');
   }, [flash, setTab]);
 
-  // prospect -----------------------------------------------------------
-  const [prospects, setProspects] = useState(() => PROSPECTS.map((p) => ({ ...p })));
-  const [prospectQuery, setProspectQuery] = useState(
-    'Commercial properties with 2+ acres of turf within 20 mi of Lehi, not already in CRM'
-  );
-  const selectedCount = useMemo(() => prospects.filter((p) => p.sel).length, [prospects]);
+  // prospect -> map contact handoff -------------------------------------
+  // Prospect tab looks up real employees per business and lets a rep push one
+  // over to the Map tab; Map tab reveals email/phone on demand and saves the
+  // result to localStorage (via contactStorage.js) so it survives a reload.
+  const [savedContacts, setSavedContacts] = useState(() => loadSavedContacts());
+  const [pendingContact, setPendingContact] = useState(null); // { mapsUrl, firstName, lastName, title }
+  const [focusMapsUrl, setFocusMapsUrl] = useState(null);
+
+  const saveContact = useCallback((mapsUrl, contact) => {
+    setSavedContacts((prev) => {
+      const next = { ...prev, [mapsUrl]: contact };
+      persistSavedContacts(next);
+      return next;
+    });
+    setPendingContact((p) => (p?.mapsUrl === mapsUrl ? null : p));
+  }, []);
+
+  const pushToMap = useCallback((business, employee) => {
+    setPendingContact({ mapsUrl: business.mapsUrl, firstName: employee.firstName, lastName: employee.lastName, title: employee.title });
+    setFocusMapsUrl(business.mapsUrl);
+    setTab('map');
+  }, [setTab]);
 
   // enrich -------------------------------------------------------------
   const [contacts, setContacts] = useState(() => CONTACTS.map((c) => ({ ...c })));
@@ -190,6 +207,13 @@ export default function App() {
           onSync={() => flash('Syncing from Clay - 2,773 accounts up to date')}
           onSurrounding={() => { openEnrich('Silver Lake Business Park', 'from map - Lehi, UT'); flash('3 businesses found nearby'); }}
           onAsk={() => setTab('chat')}
+          savedContacts={savedContacts}
+          onSaveContact={saveContact}
+          pendingContact={pendingContact}
+          focusMapsUrl={focusMapsUrl}
+          onFocusHandled={() => setFocusMapsUrl(null)}
+          spend={spend}
+          flash={flash}
         />
 
         {tab === 'chat' && (
@@ -208,21 +232,7 @@ export default function App() {
         )}
 
         {tab === 'prospect' && (
-          <ProspectView
-            query={prospectQuery}
-            setQuery={setProspectQuery}
-            prospects={prospects}
-            selectedCount={selectedCount}
-            toggle={(i) => setProspects((list) => list.map((p, n) => (n === i ? { ...p, sel: !p.sel } : p)))}
-            onEnrich={(p) => openEnrich(p.name, 'from prospect - ' + p.city + ', UT')}
-            onAddToMap={() => {
-              if (!selectedCount) return;
-              setShowing((s) => s + selectedCount);
-              setPinned(selectedCount + ' prospects added to map');
-              setTab('map');
-              flash(selectedCount + ' prospects added to the map');
-            }}
-          />
+          <ProspectView onPushToMap={pushToMap} spend={spend} flash={flash} />
         )}
 
         {tab === 'enrich' && (

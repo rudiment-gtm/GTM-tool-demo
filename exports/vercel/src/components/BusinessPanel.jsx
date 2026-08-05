@@ -9,7 +9,7 @@ const row = { display: 'flex', alignItems: 'center', justifyContent: 'space-betw
 const rowLabel = { color: C.textDim, fontSize: 12 };
 const rowValue = { color: '#EDEDEA', fontSize: 12.5, textAlign: 'right', maxWidth: 220 };
 
-export default function BusinessPanel({ business, contactState, onFindContacts, onClose }) {
+export default function BusinessPanel({ business, contactState, onFindContacts, onRevealEmail, onRevealPhone, onSaveContact, onClose }) {
   if (!business) return null;
   const b = business;
   const state = contactState || {};
@@ -51,17 +51,61 @@ export default function BusinessPanel({ business, contactState, onFindContacts, 
 
       {contact ? (
         <div style={{ background: C.card, border: '1px solid ' + C.borderStrong, borderRadius: 10, padding: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1F6F45', color: '#DFF7E8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600 }}>
-              {initials(contact.name || '?')}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1F6F45', color: '#DFF7E8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600 }}>
+                {initials(contact.name || '?')}
+              </div>
+              <div>
+                <div style={{ color: '#EDEDEA', fontSize: 12.5, fontWeight: 600 }}>{contact.name}</div>
+                {contact.title && <div style={{ color: C.textDim, fontSize: 11 }}>{contact.title}</div>}
+              </div>
             </div>
-            <div>
-              <div style={{ color: '#EDEDEA', fontSize: 12.5, fontWeight: 600 }}>{contact.name}</div>
-              {contact.title && <div style={{ color: C.textDim, fontSize: 11 }}>{contact.title}</div>}
-            </div>
+            {state.saved && <span style={{ color: C.green, fontSize: 10.5 }}>Saved &#10003;</span>}
           </div>
-          {contact.phone && <div style={{ color: C.textBody, fontSize: 12, marginBottom: 4 }}>{contact.phone}</div>}
-          {contact.email && <div style={{ color: C.textBody, fontSize: 12 }}>{contact.email}</div>}
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+            <span style={{ color: C.textDim, fontSize: 11.5 }}>Email</span>
+            {contact.email ? (
+              <span style={{ color: C.textBody, fontSize: 12 }}>{contact.email}</span>
+            ) : state.notConfiguredReveal ? (
+              <span style={{ color: C.textFaint, fontSize: 11.5 }}>Not connected</span>
+            ) : contact.firstName && contact.lastName ? (
+              <span
+                onClick={state.revealingEmail ? undefined : () => onRevealEmail(b)}
+                style={{ color: state.revealingEmail ? C.textDim : C.green, fontSize: 11.5, cursor: state.revealingEmail ? 'default' : 'pointer' }}
+              >
+                {state.revealingEmail ? 'Revealing…' : 'Reveal email'}
+              </span>
+            ) : (
+              <span style={{ color: C.textFaint, fontSize: 11.5 }}>—</span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+            <span style={{ color: C.textDim, fontSize: 11.5 }}>Mobile</span>
+            {contact.phone ? (
+              <span style={{ color: C.textBody, fontSize: 12 }}>{contact.phone}</span>
+            ) : state.notConfiguredReveal ? (
+              <span style={{ color: C.textFaint, fontSize: 11.5 }}>Not connected</span>
+            ) : contact.email ? (
+              <span
+                onClick={state.revealingPhone ? undefined : () => onRevealPhone(b)}
+                style={{ color: state.revealingPhone ? C.textDim : C.green, fontSize: 11.5, cursor: state.revealingPhone ? 'default' : 'pointer' }}
+              >
+                {state.revealingPhone ? 'Revealing…' : 'Reveal mobile'}
+              </span>
+            ) : (
+              <span style={{ color: C.textFaint, fontSize: 11.5 }}>Reveal email first</span>
+            )}
+          </div>
+
+          <div
+            onClick={() => onSaveContact(b)}
+            style={{ marginTop: 10, textAlign: 'center', border: '1px solid ' + C.borderStrong, borderRadius: 8, padding: '7px 12px', fontSize: 11.5, color: C.textBody, cursor: 'pointer' }}
+          >
+            {state.saved ? 'Update saved contact' : 'Save contact'}
+          </div>
         </div>
       ) : (
         <div>

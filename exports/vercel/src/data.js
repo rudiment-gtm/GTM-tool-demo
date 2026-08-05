@@ -104,17 +104,6 @@ Formatting rules - the chat UI renders your reply as plain text or as a data tab
   Include at most 20 rows in the array even if "total" is larger - never list more than 20, summarize the rest in "text" instead.
 - For every other kind of question (advice, comparisons, strategy, yes/no, anything not a literal list of businesses), reply in plain text only - do not use the JSON shape.`;
 
-export const PROSPECTS = [
-  { name: 'Silver Lake Business Park', type: 'Commercial', city: 'Lehi', turf: '6.2 ac', value: '$18,400', sel: true },
-  { name: 'Traverse Ridge HOA', type: 'HOA', city: 'Draper', turf: '4.8 ac', value: '$14,900', sel: true },
-  { name: 'Thanksgiving Point Offices', type: 'Commercial', city: 'Lehi', turf: '3.9 ac', value: '$11,600', sel: false },
-  { name: 'Meadow Crossing Apartments', type: 'Multifamily', city: 'American Fork', turf: '3.1 ac', value: '$9,750', sel: true },
-  { name: 'Pointe West Medical', type: 'Commercial', city: 'Saratoga Springs', turf: '2.4 ac', value: '$7,300', sel: false },
-  { name: 'Willow Bend HOA', type: 'HOA', city: 'Highland', turf: '2.2 ac', value: '$6,900', sel: false },
-  { name: 'Canyon Gate Corporate Center', type: 'Commercial', city: 'Alpine', turf: '2.1 ac', value: '$6,400', sel: false },
-  { name: 'Northshore Townhomes', type: 'Multifamily', city: 'Vineyard', turf: '2.0 ac', value: '$5,850', sel: false },
-];
-
 export const CONTACTS = [
   { name: 'Dana Whitmore', title: 'Director of Facilities', email: 'd.whitmore@silverlakebp.com', phone: '(801) 555-0142', revealed: true },
   { name: 'Marcus Field', title: 'Property Manager', email: 'm.field@silverlakebp.com', phone: '(801) 555-0187', revealed: false },
